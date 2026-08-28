@@ -1,0 +1,378 @@
+```python
+# Importa o módulo sqlite3, que permite trabalhar com bancos de dados SQLite.
+#
+# O SQLite é um banco de dados que normalmente fica armazenado
+# em um arquivo, por exemplo:
+#
+#     techlog.db
+#
+# Com o sqlite3 conseguimos abrir esse arquivo, executar comandos SQL,
+# inserir dados, consultar dados, atualizar, excluir etc.
+import sqlite3
+
+
+# Importa o "contextmanager" do módulo contextlib.
+#
+# O @contextmanager será utilizado mais abaixo para transformar
+# o método "conectar()" em um gerenciador de contexto.
+#
+# Isso permitirá utilizar o método desta forma:
+#
+#     with self.conectar() as conexao:
+#
+# A principal vantagem é conseguirmos controlar automaticamente
+# a abertura, confirmação, rollback e fechamento da conexão.
+from contextlib import contextmanager
+
+
+# "class" é a palavra reservada utilizada para criar uma classe.
+#
+# A classe pode ser entendida como um "molde" para criar objetos.
+#
+# Neste caso, nossa classe será responsável por controlar
+# as operações relacionadas ao banco de dados local.
+#
+# O nome da classe é:
+#
+#     BancoDeDadosLocal
+#
+# Em Python, por convenção, nomes de classes utilizam
+# PascalCase (primeira letra de cada palavra maiúscula).
+class BancoDeDadosLocal:
+
+    # ---------------------------------------------------------
+    # MÉTODO __init__
+    # ---------------------------------------------------------
+    #
+    # O __init__ é um método especial do Python.
+    #
+    # Ele é executado automaticamente quando criamos um objeto
+    # dessa classe.
+    #
+    # Exemplo:
+    #
+    #     banco = BancoDeDadosLocal()
+    #
+    # Ao executar essa linha, o Python automaticamente chama:
+    #
+    #     __init__()
+    #
+    # "self" representa o próprio objeto que está sendo criado.
+    #
+    # "nome_arquivo" é um parâmetro que recebe o nome do arquivo
+    # onde o banco SQLite será armazenado.
+    #
+    # O valor "techlog.db" é o valor padrão.
+    #
+    # Portanto:
+    #
+    #     BancoDeDadosLocal()
+    #
+    # é equivalente a:
+    #
+    #     BancoDeDadosLocal("techlog.db")
+    #
+    # Mas também podemos escolher outro arquivo:
+    #
+    #     BancoDeDadosLocal("meu_banco.db")
+    def __init__(self, nome_arquivo="techlog.db"):
+
+        # "self.nome_arquivo" é um atributo do objeto.
+        #
+        # Estamos armazenando dentro do objeto o nome do arquivo
+        # que será utilizado como banco de dados.
+        #
+        # Se fizermos:
+        #
+        #     banco = BancoDeDadosLocal()
+        #
+        # teremos:
+        #
+        #     banco.nome_arquivo
+        #
+        # contendo:
+        #
+        #     "techlog.db"
+        self.nome_arquivo = nome_arquivo
+
+
+    # ---------------------------------------------------------
+    # MÉTODO conectar()
+    # ---------------------------------------------------------
+    #
+    # "def" é a palavra reservada utilizada para criar
+    # uma função ou método.
+    #
+    # Como "conectar()" está dentro de uma classe, ele é
+    # chamado de método.
+    #
+    # O "self" permite que esse método tenha acesso aos
+    # atributos do objeto, como:
+    #
+    #     self.nome_arquivo
+    #
+    # O @contextmanager é um decorador.
+    #
+    # Ele transforma esse método em um gerenciador de contexto,
+    # permitindo utilizar:
+    #
+    #     with self.conectar() as conexao:
+    #
+    # O "with" será explicado nos comentários abaixo.
+    @contextmanager
+    def conectar(self):
+
+        # sqlite3.connect() abre uma conexão com o banco SQLite.
+        #
+        # Como self.nome_arquivo contém "techlog.db", essa linha
+        # equivale a:
+        #
+        #     sqlite3.connect("techlog.db")
+        #
+        # Se o arquivo ainda não existir, o SQLite normalmente
+        # criará o arquivo.
+        #
+        # A variável "conexao" representa a conexão aberta
+        # com o banco de dados.
+        conexao = sqlite3.connect(self.nome_arquivo)
+
+
+        # -----------------------------------------------------
+        # try
+        # -----------------------------------------------------
+        #
+        # "try" é utilizado para tentar executar um trecho
+        # de código que pode gerar algum erro.
+        #
+        # Se tudo funcionar, continuamos normalmente.
+        #
+        # Se acontecer algum erro, o Python irá procurar
+        # um bloco "except" para tratar esse erro.
+        try:
+
+            # "yield" é utilizado aqui porque estamos trabalhando
+            # com um @contextmanager.
+            #
+            # Podemos pensar no yield, neste caso, como:
+            #
+            #     "Entregue a conexão para quem está usando
+            #      o bloco with e aguarde."
+            #
+            # Por exemplo, quando fizermos:
+            #
+            #     with self.conectar() as conexao:
+            #
+            # o objeto que foi enviado pelo:
+            #
+            #     yield conexao
+            #
+            # será recebido pela variável:
+            #
+            #     conexao
+            yield conexao
+
+
+            # commit() confirma as alterações realizadas no banco.
+            #
+            # Imagine que executamos:
+            #
+            #     INSERT
+            #
+            # ou:
+            #
+            #     UPDATE
+            #
+            # ou:
+            #
+            #     DELETE
+            #
+            # O commit confirma essas alterações.
+            #
+            # Neste código, o commit só acontece se tudo dentro
+            # do bloco "with" tiver funcionado corretamente.
+            conexao.commit()
+
+
+        # -----------------------------------------------------
+        # except
+        # -----------------------------------------------------
+        #
+        # Se ocorrer algum erro dentro do try, o Python entra
+        # neste bloco.
+        #
+        # "Exception" representa uma exceção/erro do Python.
+        #
+        # "as e" coloca o erro dentro da variável "e".
+        #
+        # Poderíamos, por exemplo, fazer:
+        #
+        #     print(e)
+        #
+        # para visualizar a mensagem do erro.
+        except Exception as e:
+
+            # rollback() desfaz as alterações realizadas
+            # durante a transação que ainda não foram confirmadas
+            # pelo commit().
+            #
+            # Isso é importante para evitar deixar o banco
+            # parcialmente alterado caso alguma operação falhe.
+            #
+            # Exemplo:
+            #
+            #     INSERT cliente 1
+            #     INSERT cliente 2
+            #     INSERT cliente 3
+            #     ERRO
+            #
+            # O rollback pode desfazer as alterações dessa
+            # transação.
+            conexao.rollback()
+
+
+            # "raise" faz o erro continuar sendo lançado.
+            #
+            # Como fizemos:
+            #
+            #     except Exception as e:
+            #
+            # a variável "e" contém o erro que aconteceu.
+            #
+            # Portanto:
+            #
+            #     raise e
+            #
+            # significa que estamos lançando novamente esse erro
+            # para que quem chamou o método possa tratá-lo.
+            raise e
+
+
+        # -----------------------------------------------------
+        # finally
+        # -----------------------------------------------------
+        #
+        # "finally" é executado independentemente de ter ocorrido
+        # um erro ou não.
+        #
+        # Isso é muito útil para recursos que precisam ser
+        # liberados, como conexões com banco de dados,
+        # arquivos etc.
+        finally:
+
+            # close() fecha a conexão com o banco.
+            #
+            # Dessa forma, depois que terminarmos de utilizar
+            # o banco, a conexão não ficará aberta desnecessariamente.
+            conexao.close()
+
+
+    # ---------------------------------------------------------
+    # MÉTODO inicializar_banco()
+    # ---------------------------------------------------------
+    #
+    # Este método será responsável por inicializar o banco
+    # e criar a tabela "clientes", caso ela ainda não exista.
+    def inicializar_banco(self):
+
+        # "with" é utilizado para trabalhar com um
+        # gerenciador de contexto.
+        #
+        # Nosso método conectar() foi preparado com
+        # @contextmanager justamente para podermos fazer isso.
+        #
+        # O fluxo será aproximadamente:
+        #
+        #     1. Abre a conexão
+        #     2. Entrega a conexão para "conexao"
+        #     3. Executa o código dentro do with
+        #     4. Faz commit se tudo funcionar
+        #     5. Faz rollback se houver erro
+        #     6. Fecha a conexão
+        with self.conectar() as conexao:
+
+            # cursor() cria um cursor para executar comandos SQL.
+            #
+            # Podemos imaginar a estrutura desta forma:
+            #
+            #     conexão
+            #         |
+            #         +---- cursor
+            #                   |
+            #                   +---- execute(SQL)
+            #
+            # O cursor será utilizado logo abaixo para
+            # executar o comando CREATE TABLE.
+            cursor = conexao.cursor()
+
+
+            # execute() executa um comando SQL no banco.
+            #
+            # Aqui estamos passando um comando SQL para
+            # criar a tabela "clientes".
+            #
+            # As três aspas:
+            #
+            #     """
+            #
+            # permitem escrever uma string em várias linhas.
+            #
+            # Portanto, tudo dentro das aspas é apenas uma
+            # string Python contendo nosso comando SQL.
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS clientes (
+                    
+                    -- ID único do cliente.
+                    --
+                    -- INTEGER = número inteiro.
+                    --
+                    -- PRIMARY KEY = identifica exclusivamente
+                    -- cada registro da tabela.
+                    --
+                    -- AUTOINCREMENT = faz o SQLite gerar
+                    -- automaticamente o próximo ID.
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+
+                    -- Nome do cliente.
+                    --
+                    -- TEXT = texto.
+                    --
+                    -- NOT NULL = esse campo não pode ficar vazio.
+                    nome TEXT NOT NULL,
+
+
+                    -- E-mail do cliente.
+                    --
+                    -- Também será armazenado como texto.
+                    email TEXT NOT NULL,
+
+
+                    -- Telefone do cliente.
+                    --
+                    -- Também será armazenado como texto.
+                    --
+                    -- É interessante utilizar TEXT para telefone
+                    -- porque telefone não é realmente um número
+                    -- utilizado para cálculos.
+                    --
+                    -- Além disso, um telefone pode possuir:
+                    --
+                    --     +55
+                    --     0
+                    --     espaços
+                    --     parênteses
+                    --     hífen
+                    telefone TEXT NOT NULL
+                )
+                """
+            )
+
+        # Este print será executado depois que o bloco "with"
+        # terminar corretamente.
+        #
+        # Como o bloco with também realiza o commit e fecha
+        # a conexão, chegar aqui significa que a inicialização
+        # foi concluída sem gerar uma exceção.
+        print("Banco de dados inicializado.")
+```
